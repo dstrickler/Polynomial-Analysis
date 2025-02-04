@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polynomial Analysis for Beaver</title>
+</head>
+<body>
+<h1>Polynomial Analysis Tool for Beaver</h1>
+<form id="polynomialForm">
+    <label for="polynomial">Enter the polynomial coefficients (highest to lowest, e.g., for x^3 - 3x^2 + 2x, enter 1 -3 2 0):</label><br>
+    <input type="text" id="polynomial" name="polynomial" required><br><br>
+
+    <label for="xUnits">Enter the units for x:</label><br>
+    <input type="text" id="xUnits" name="xUnits" required><br><br>
+
+    <label for="yUnits">Enter the units for y:</label><br>
+    <input type="text" id="yUnits" name="yUnits" required><br><br>
+
+    <button type="submit">Analyze</button>
+</form>
+
+<h2>Results</h2>
+<div id="results"></div>
+
+<script>
+    // Function to compute numerical derivative
+    function derivative(func, x, dx = 1e-6) {
+        return (func(x + dx) - func(x - dx)) / (2 * dx);
+    }
+
+    // Function to compute second derivative
+    function secondDerivative(func, x, dx = 1e-6) {
+        return (func(x + dx) - 2 * func(x) + func(x - dx)) / (dx * dx);
+    }
+
+    // Parse polynomial coefficients into a function
+    function createPolynomialFunction(coefficients) {
+        return (x) => {
+            return coefficients.reduce((sum, coef, index) => {
+                return sum + coef * Math.pow(x, coefficients.length - index - 1);
+            }, 0);
+        };
+    }
+
+    // Analyze the polynomial
+    function analyzePolynomial(coefficients, xUnits, yUnits) {
+        const f = createPolynomialFunction(coefficients);
+
+        // Find critical points (f'(x) = 0) and inflection points (f''(x) = 0)
+        const criticalPoints = [];
+        const inflectionPoints = [];
+
+        for (let x = -10; x <= 10; x += 0.1) {
+            if (Math.abs(derivative(f, x)) < 1e-3) {
+                criticalPoints.push(x.toFixed(3));
+            }
+            if (Math.abs(secondDerivative(f, x)) < 1e-3) {
+                inflectionPoints.push(x.toFixed(3));
+            }
+        }
+
+        // Remove duplicates and sort points
+        const uniqueCriticalPoints = [...new Set(criticalPoints)].map(Number).sort((a, b) => a - b);
+        const uniqueInflectionPoints = [...new Set(inflectionPoints)].map(Number).sort((a, b) => a - b);
+
+        // Determine intervals of increase, decrease, concavity
+        const increasingIntervals = [];
+        const decreasingIntervals = [];
+        for (let i = 0; i < uniqueCriticalPoints.length - 1; i++) {
+            const midPoint = (uniqueCriticalPoints[i] + uniqueCriticalPoints[i + 1]) / 2;
+            if (derivative(f, midPoint) > 0) {
+                increasingIntervals.push([uniqueCriticalPoints[i], uniqueCriticalPoints[i + 1]]);
+            } else {
+                decreasingIntervals.push([uniqueCriticalPoints[i], uniqueCriticalPoints[i + 1]]);
+            }
+        }
+
+        const concaveUpIntervals = [];
+        const concaveDownIntervals = [];
+        for (let i = 0; i < uniqueInflectionPoints.length - 1; i++) {
+            const midPoint = (uniqueInflectionPoints[i] + uniqueInflectionPoints[i + 1]) / 2;
+            if (secondDerivative(f, midPoint) > 0) {
+                concaveUpIntervals.push([uniqueInflectionPoints[i], uniqueInflectionPoints[i + 1]]);
+            } else {
+                concaveDownIntervals.push([uniqueInflectionPoints[i], uniqueInflectionPoints[i + 1]]);
+            }
+        }
+
+        // Relative extrema
+        const extrema = uniqueCriticalPoints.map((cp) => {
+            const secondDeriv = secondDerivative(f, cp);
+            if (secondDeriv > 0) {
+                return { x: cp, y: f(cp), type: "Minimum" };
+            } else if (secondDeriv < 0) {
+                return { x: cp, y: f(cp), type: "Maximum" };
+            } else {
+                return null;
+            }
+        }).filter(Boolean);
+
+        // Points of inflection
+        const pointsOfInflection = uniqueInflectionPoints.map((ip) => ({
+            x: ip,
+            y: f(ip)
+        }));
+
+        return {
+            increasingIntervals,
+            decreasingIntervals,
+            extrema,
+            concaveUpIntervals,
+            concaveDownIntervals,
+            pointsOfInflection
+        };
+    }
+
+    // Event listener for form submission
+    document.getElementById("polynomialForm").addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        const polynomialInput = document.getElementById("polynomial").value;
+        const xUnits = document.getElementById("xUnits").value;
+        const yUnits = document.getElementById("yUnits").value;
+
+        const coefficients = polynomialInput.split(" ").map(Number);
+        const results = analyzePolynomial(coefficients, xUnits, yUnits);
+
+        const resultsDiv = document.getElementById("results");
+        resultsDiv.innerHTML = `
+                <h3>Analysis Results</h3>
+                <p><strong>Increasing Intervals:</strong> ${JSON.stringify(results.increasingIntervals)}</p>
+                <p><strong>Decreasing Intervals:</strong> ${JSON.stringify(results.decreasingIntervals)}</p>
+                <p><strong>Relative Extrema:</strong> ${results.extrema.map(e => `${e.type} at x=${e.x}, y=${e.y}`).join(", ")}</p>
+                <p><strong>Concave Up Intervals:</strong> ${JSON.stringify(results.concaveUpIntervals)}</p>
+                <p><strong>Concave Down Intervals:</strong> ${JSON.stringify(results.concaveDownIntervals)}</p>
+                <p><strong>Points of Inflection:</strong> ${results.pointsOfInflection.map(p => `x=${p.x}, y=${p.y}`).join(", ")}</p>
+            `;
+    });
+</script>
+</body>
+</html>
